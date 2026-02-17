@@ -1,0 +1,39 @@
+{
+  "name": "gmasap-api",
+  "version": "1.0.0",
+  "description": "GMASAP Serverless API Backend",
+  "scripts": {
+    "build": "sam build",
+    "deploy": "sam deploy",
+    "deploy:guided": "sam deploy --guided --stack-name gmasap-dev",
+    "local": "sam local start-api --port 3000",
+    "dynamodb": "docker run -p 8000:8000 amazon/dynamodb-local",
+    "test": "npm run test --workspaces",
+    "test:integration": "jest tests/",
+    "clean": "rm -rf .aws-sam/",
+    "logs": "sam logs -n AuthFunction --stack-name gmasap-dev --tail"
+  },
+  "workspaces": [
+    "src/auth",
+    "src/athletes", 
+    "src/feed"
+  ],
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "@types/aws-lambda": "^8.10.126"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/gmasap/gmasap-api"
+  },
+  "keywords": [
+    "serverless",
+    "aws",
+    "lambda",
+    "dynamodb",
+    "sports",
+    "recruitment"
+  ],
+  "author": "GMASAP Team",
+  "license": "MIT"
+}

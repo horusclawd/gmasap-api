@@ -1,0 +1,25 @@
+version = 0.1
+
+[default]
+[default.deploy]
+[default.deploy.parameters]
+stack_name = "gmasap-dev"
+s3_bucket = ""  # Will be created during guided deploy
+s3_prefix = "gmasap-api"
+region = "us-east-1"
+confirm_changeset = true
+capabilities = "CAPABILITY_IAM"
+parameter_overrides = [
+    "Environment=dev",
+    "DomainName=api-dev.gmasap.com"
+]
+
+[default.local_start_api]
+[default.local_start_api.parameters]
+port = 3000
+env_vars = "env.json"
+
+[default.local_start_lambda]
+[default.local_start_lambda.parameters]
+port = 3001
+env_vars = "env.json"

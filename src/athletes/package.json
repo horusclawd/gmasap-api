@@ -1,0 +1,13 @@
+{
+  "name": "gmasap-athletes-function",
+  "version": "1.0.0",
+  "description": "GMASAP Athletes Lambda Function",
+  "main": "index.js",
+  "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.490.0",
+    "@aws-sdk/lib-dynamodb": "^3.490.0",
+    "@aws-sdk/client-eventbridge": "^3.490.0",
+    "@aws-sdk/client-s3": "^3.490.0",
+    "@aws-sdk/s3-request-presigner": "^3.490.0"
+  }
+}

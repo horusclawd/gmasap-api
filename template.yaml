@@ -1,0 +1,404 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  GMASAP API - Event-driven serverless backend for athlete recruitment platform
+
+# Globals section for common function properties
+Globals:
+  Function:
+    Timeout: 30
+    MemorySize: 256
+    Runtime: nodejs20.x
+    Environment:
+      Variables:
+        USERS_TABLE: !Ref UsersTable
+        POSTS_TABLE: !Ref PostsTable
+        ATHLETES_TABLE: !Ref AthletesTable
+        MEDIA_BUCKET: !Ref MediaBucket
+        EVENT_BUS_NAME: !Ref GmasapEventBus
+        NODE_ENV: !Ref Environment
+  Api:
+    Cors:
+      AllowMethods: "'GET,POST,PUT,PATCH,DELETE,OPTIONS'"
+      AllowHeaders: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+      AllowOrigin: "'*'"
+
+Parameters:
+  Environment:
+    Type: String
+    Default: dev
+    AllowedValues: [dev, staging, prod]
+  
+  DomainName:
+    Type: String
+    Default: api-dev.gmasap.com
+    Description: Custom domain name for API
+
+Resources:
+  # Shared Utilities Layer
+  SharedUtilitiesLayer:
+    Type: AWS::Serverless::LayerVersion
+    Properties:
+      LayerName: !Sub 'gmasap-${Environment}-shared-utilities'
+      ContentUri: SharedUtilitiesLayer/
+      CompatibleRuntimes:
+        - nodejs20.x
+
+  # API Gateway
+  GmasapApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName: !Ref Environment
+      # Domain configuration removed for Phase 1 cost optimization
+      # Will use default API Gateway endpoint instead
+      DefinitionBody:
+        openapi: '3.0.1'
+        info:
+          title: GMASAP API
+          version: '1.0'
+        paths:
+          /auth/{proxy+}:
+            x-amazon-apigateway-any-method:
+              x-amazon-apigateway-integration:
+                type: aws_proxy
+                httpMethod: POST
+                uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${AuthFunction.Arn}/invocations'
+          /athletes/{proxy+}:
+            x-amazon-apigateway-any-method:
+              x-amazon-apigateway-integration:
+                type: aws_proxy
+                httpMethod: POST
+                uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${AthletesFunction.Arn}/invocations'
+          /feed/{proxy+}:
+            x-amazon-apigateway-any-method:
+              x-amazon-apigateway-integration:
+                type: aws_proxy
+                httpMethod: POST
+                uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${FeedFunction.Arn}/invocations'
+
+  # SSL Certificate for custom domain (optional - remove for Phase 1 cost optimization)
+  # SSLCertificate:
+  #   Type: AWS::CertificateManager::Certificate
+  #   Properties:
+  #     DomainName: !Ref DomainName
+  #     ValidationMethod: DNS
+
+  # Lambda Functions
+  AuthFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub 'gmasap-${Environment}-auth'
+      CodeUri: src/auth/
+      Handler: index.handler
+      Layers:
+        - !Ref SharedUtilitiesLayer
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref UsersTable
+        - EventBridgePutEventsPolicy:
+            EventBusName: !Ref GmasapEventBus
+      Events:
+        AuthApi:
+          Type: Api
+          Properties:
+            RestApiId: !Ref GmasapApi
+            Path: /auth/{proxy+}
+            Method: ANY
+
+  AthletesFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub 'gmasap-${Environment}-athletes'
+      CodeUri: src/athletes/
+      Handler: index.handler
+      Layers:
+        - !Ref SharedUtilitiesLayer
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref AthletesTable
+        - S3CrudPolicy:
+            BucketName: !Ref MediaBucket
+        - EventBridgePutEventsPolicy:
+            EventBusName: !Ref GmasapEventBus
+      Events:
+        AthletesApi:
+          Type: Api
+          Properties:
+            RestApiId: !Ref GmasapApi
+            Path: /athletes/{proxy+}
+            Method: ANY
+
+  FeedFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub 'gmasap-${Environment}-feed'
+      CodeUri: src/feed/
+      Handler: index.handler
+      Layers:
+        - !Ref SharedUtilitiesLayer
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref PostsTable
+        - S3CrudPolicy:
+            BucketName: !Ref MediaBucket
+        - EventBridgePutEventsPolicy:
+            EventBusName: !Ref GmasapEventBus
+      Events:
+        FeedApi:
+          Type: Api
+          Properties:
+            RestApiId: !Ref GmasapApi
+            Path: /feed/{proxy+}
+            Method: ANY
+
+  # DynamoDB Tables
+  UsersTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub 'gmasap-${Environment}-users'
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: PK
+          AttributeType: S
+        - AttributeName: SK
+          AttributeType: S
+        - AttributeName: email
+          AttributeType: S
+        - AttributeName: provider
+          AttributeType: S
+      KeySchema:
+        - AttributeName: PK
+          KeyType: HASH
+        - AttributeName: SK
+          KeyType: RANGE
+      GlobalSecondaryIndexes:
+        - IndexName: email-index
+          KeySchema:
+            - AttributeName: email
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+        - IndexName: provider-index
+          KeySchema:
+            - AttributeName: provider
+              KeyType: HASH
+            - AttributeName: email
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+      StreamSpecification:
+        StreamViewType: NEW_AND_OLD_IMAGES
+
+  PostsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub 'gmasap-${Environment}-posts'
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: PK
+          AttributeType: S
+        - AttributeName: SK
+          AttributeType: S
+        - AttributeName: timestamp
+          AttributeType: N
+        - AttributeName: author
+          AttributeType: S
+      KeySchema:
+        - AttributeName: PK
+          KeyType: HASH
+        - AttributeName: SK
+          KeyType: RANGE
+      GlobalSecondaryIndexes:
+        - IndexName: timestamp-index
+          KeySchema:
+            - AttributeName: timestamp
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+        - IndexName: author-index
+          KeySchema:
+            - AttributeName: author
+              KeyType: HASH
+            - AttributeName: timestamp
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+      StreamSpecification:
+        StreamViewType: NEW_AND_OLD_IMAGES
+
+  AthletesTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub 'gmasap-${Environment}-athletes'
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: PK
+          AttributeType: S
+        - AttributeName: SK
+          AttributeType: S
+        - AttributeName: sport
+          AttributeType: S
+        - AttributeName: position
+          AttributeType: S
+        - AttributeName: graduationYear
+          AttributeType: N
+        - AttributeName: state
+          AttributeType: S
+      KeySchema:
+        - AttributeName: PK
+          KeyType: HASH
+        - AttributeName: SK
+          KeyType: RANGE
+      GlobalSecondaryIndexes:
+        - IndexName: sport-position-index
+          KeySchema:
+            - AttributeName: sport
+              KeyType: HASH
+            - AttributeName: position
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+        - IndexName: sport-graduation-index
+          KeySchema:
+            - AttributeName: sport
+              KeyType: HASH
+            - AttributeName: graduationYear
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+        - IndexName: state-sport-index
+          KeySchema:
+            - AttributeName: state
+              KeyType: HASH
+            - AttributeName: sport
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+      StreamSpecification:
+        StreamViewType: NEW_AND_OLD_IMAGES
+
+  # S3 Bucket for media storage
+  MediaBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub 'gmasap-${Environment}-media-${AWS::AccountId}'
+      CorsConfiguration:
+        CorsRules:
+          - AllowedHeaders: ['*']
+            AllowedMethods: [GET, POST, PUT, DELETE, HEAD]
+            AllowedOrigins: ['*']
+            MaxAge: 3000
+      LifecycleConfiguration:
+        Rules:
+          - Id: DeleteIncompleteMultipartUploads
+            Status: Enabled
+            AbortIncompleteMultipartUpload:
+              DaysAfterInitiation: 1
+          - Id: TransitionToIA
+            Status: Enabled
+            Transition:
+              StorageClass: STANDARD_IA
+              TransitionInDays: 30
+
+  # EventBridge Custom Bus
+  GmasapEventBus:
+    Type: AWS::Events::EventBus
+    Properties:
+      Name: !Sub 'gmasap-${Environment}-events'
+
+  # IAM Role for Lambda functions
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: DynamoDBAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:PutItem
+                  - dynamodb:GetItem
+                  - dynamodb:UpdateItem
+                  - dynamodb:DeleteItem
+                  - dynamodb:Query
+                  - dynamodb:Scan
+                Resource:
+                  - !GetAtt UsersTable.Arn
+                  - !GetAtt PostsTable.Arn
+                  - !GetAtt AthletesTable.Arn
+                  - !Sub '${UsersTable.Arn}/index/*'
+                  - !Sub '${PostsTable.Arn}/index/*'
+                  - !Sub '${AthletesTable.Arn}/index/*'
+        - PolicyName: S3Access
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:PutObject
+                  - s3:DeleteObject
+                  - s3:GetObjectAcl
+                  - s3:PutObjectAcl
+                Resource: !Sub '${MediaBucket}/*'
+        - PolicyName: EventBridgeAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - events:PutEvents
+                Resource: !GetAtt GmasapEventBus.Arn
+
+Outputs:
+  GmasapApiUrl:
+    Description: 'API Gateway endpoint URL'
+    Value: !Sub 'https://${GmasapApi}.execute-api.${AWS::Region}.amazonaws.com/${Environment}/'
+    Export:
+      Name: !Sub '${AWS::StackName}-ApiUrl'
+  
+  GmasapCustomDomainUrl:
+    Description: 'Custom domain URL'
+    Value: !Sub 'https://${DomainName}/'
+    Export:
+      Name: !Sub '${AWS::StackName}-CustomDomainUrl'
+
+  UsersTableName:
+    Description: 'DynamoDB Users table name'
+    Value: !Ref UsersTable
+    Export:
+      Name: !Sub '${AWS::StackName}-UsersTable'
+
+  PostsTableName:
+    Description: 'DynamoDB Posts table name'
+    Value: !Ref PostsTable
+    Export:
+      Name: !Sub '${AWS::StackName}-PostsTable'
+
+  AthletesTableName:
+    Description: 'DynamoDB Athletes table name'
+    Value: !Ref AthletesTable
+    Export:
+      Name: !Sub '${AWS::StackName}-AthletesTable'
+
+  MediaBucketName:
+    Description: 'S3 Media bucket name'
+    Value: !Ref MediaBucket
+    Export:
+      Name: !Sub '${AWS::StackName}-MediaBucket'
+
+  EventBusName:
+    Description: 'EventBridge custom bus name'
+    Value: !Ref GmasapEventBus
+    Export:
+      Name: !Sub '${AWS::StackName}-EventBus'
