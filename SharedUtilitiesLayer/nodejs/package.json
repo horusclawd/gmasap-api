@@ -1,0 +1,12 @@
+{
+  "name": "gmasap-shared-utilities",
+  "version": "1.0.0",
+  "description": "Shared utilities for GMASAP Lambda functions",
+  "dependencies": {
+    "jsonwebtoken": "^9.1.2",
+    "bcrypt": "^5.1.1",
+    "@aws-sdk/client-dynamodb": "^3.500.0",
+    "@aws-sdk/lib-dynamodb": "^3.500.0",
+    "@aws-sdk/client-eventbridge": "^3.500.0"
+  }
+}
