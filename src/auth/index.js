@@ -1,9 +1,9 @@
 const bcrypt = require('bcrypt');
-const { DynamoDBService } = require('shared/dynamodb');
-const { JWTService } = require('shared/jwt');
-const { ResponseFormatter, ErrorResponses } = require('shared/response');
-const { errorHandler, validateRequest, authMiddleware, compose } = require('shared/middleware');
-const { eventService } = require('shared/events');
+const { DynamoDBService } = require('/opt/nodejs/shared/dynamodb');
+const { JWTService } = require('/opt/nodejs/shared/jwt');
+const { ResponseFormatter, ErrorResponses } = require('/opt/nodejs/shared/response');
+const { errorHandler, validateRequest, authMiddleware, compose } = require('/opt/nodejs/shared/middleware');
+const { eventService } = require('/opt/nodejs/shared/events');
 
 // Initialize DynamoDB service
 const usersTable = new DynamoDBService(process.env.USERS_TABLE);
