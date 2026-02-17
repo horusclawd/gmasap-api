@@ -59,7 +59,8 @@ exports.handler = async (event) => {
   }
 
   // Parse the route
-  const route = `${event.httpMethod} ${event.resource}`;
+  const path = event.path || event.rawPath;
+  const route = `${event.httpMethod} ${path}`;
   const handler = routes[route];
 
   if (!handler) {
