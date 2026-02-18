@@ -2,10 +2,16 @@ const { DynamoDBClient } = require('@aws-sdk/client-dynamodb');
 const { DynamoDBDocumentClient, GetCommand, PutCommand, UpdateCommand, DeleteCommand, QueryCommand, ScanCommand } = require('@aws-sdk/lib-dynamodb');
 
 // Initialize DynamoDB client
+// NOTE: When running under `sam local`, Lambdas execute in Docker.
+// `localhost` would point at the Lambda container itself, not your host machine.
+// Use DYNAMODB_ENDPOINT (recommended) or fall back to host.docker.internal.
+const isLocal = process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'local';
+const localEndpoint = process.env.DYNAMODB_ENDPOINT || 'http://host.docker.internal:8000';
+
 const client = new DynamoDBClient({
   region: process.env.AWS_REGION || 'us-east-1',
-  ...(process.env.NODE_ENV === 'development' && {
-    endpoint: 'http://localhost:8000',
+  ...(isLocal && {
+    endpoint: localEndpoint,
     credentials: {
       accessKeyId: 'dummy',
       secretAccessKey: 'dummy'
