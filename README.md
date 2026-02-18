@@ -72,14 +72,23 @@ gmasap-api/
 docker run --rm -p 8000:8000 amazon/dynamodb-local
 ```
 
-2) Install shared layer deps (one-time / when package.json changes):
+2) Install deps:
 ```bash
+# install shared layer deps
 cd SharedUtilitiesLayer/nodejs
 npm install
 cd ../..
+
+# install repo dev deps (for local scripts)
+npm install
 ```
 
-3) Build + run SAM locally:
+3) Create DynamoDB Local tables (one-time per fresh DynamoDB Local):
+```bash
+npm run db:init
+```
+
+4) Build + run SAM locally:
 ```bash
 sam build
 sam local start-api --port 3000 --env-vars env.json

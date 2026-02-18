@@ -8,6 +8,7 @@
     "deploy:guided": "sam deploy --guided --stack-name gmasap-dev",
     "local": "sam local start-api --port 3000",
     "dynamodb": "docker run -p 8000:8000 amazon/dynamodb-local",
+    "db:init": "node scripts/dynamodb-local-init.js",
     "test": "npm run test --workspaces",
     "test:integration": "jest tests/",
     "clean": "rm -rf .aws-sam/",
@@ -20,7 +21,8 @@
   ],
   "devDependencies": {
     "jest": "^29.7.0",
-    "@types/aws-lambda": "^8.10.126"
+    "@types/aws-lambda": "^8.10.126",
+    "@aws-sdk/client-dynamodb": "^3.350.0"
   },
   "repository": {
     "type": "git",
