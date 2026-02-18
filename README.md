@@ -40,51 +40,63 @@ Event-driven serverless backend for the GMASAP athlete recruitment platform.
 - **Phase 2**: HTTP polling for updates (vs AppSync complexity)
 - **Phase 3**: Add real-time/search only when necessary
 
-## Project Structure
+## Project Structure (key bits)
 
 ```
 gmasap-api/
-├── template.yaml              # SAM template
+├── template.yaml
+├── env.json                           # local env for sam local
 ├── src/
-│   ├── auth/                 # Authentication Lambda
-│   ├── athletes/             # Athletes Lambda (placeholder)
-│   ├── feed/                 # Feed Lambda (placeholder)
-│   └── shared/               # Shared utilities
-│       ├── dynamodb.js       # DynamoDB wrapper
-│       ├── jwt.js            # JWT utilities
-│       ├── response.js       # Response formatting
-│       ├── middleware.js     # Auth & validation middleware
-│       └── events.js         # EventBridge utilities
-├── events/                   # Sample events for testing
-└── tests/                    # Integration tests
+│   ├── auth/                          # Auth Lambda
+│   ├── athletes/                      # Athletes Lambda
+│   └── feed/                          # Feed Lambda
+├── SharedUtilitiesLayer/
+│   └── nodejs/
+│       ├── shared/                    # OUR shared code (mounted at /opt/nodejs/shared)
+│       ├── node_modules/              # deps for shared layer (jsonwebtoken, aws sdk, etc.)
+│       └── package.json
+└── docs/                              # project docs + sprint notes
 ```
 
 ## Local Development Setup
 
-### Prerequisites
+### Prereqs
+- AWS SAM CLI
+- Docker
+- Node.js (for installing layer deps)
 
+### Running locally (DynamoDB Local + SAM)
+
+1) Start DynamoDB Local:
 ```bash
-# Install AWS SAM CLI
-brew install aws-sam-cli
-
-# Install Docker (for local testing)
-brew install --cask docker
-
-# Install Node.js dependencies
-npm install
+docker run --rm -p 8000:8000 amazon/dynamodb-local
 ```
 
-### Running Locally
-
+2) Install shared layer deps (one-time / when package.json changes):
 ```bash
-# Start DynamoDB Local
-docker run -p 8000:8000 amazon/dynamodb-local
+cd SharedUtilitiesLayer/nodejs
+npm install
+cd ../..
+```
 
-# Start SAM local API
-sam local start-api --port 3000
+3) Build + run SAM locally:
+```bash
+sam build
+sam local start-api --port 3000 --env-vars env.json
+```
 
-# Test endpoints
-curl http://localhost:3000/auth/register
+### Notes
+- Under `sam local`, Lambda runs in Docker. So **do not use `localhost:8000`** for DynamoDB.
+  Use `DYNAMODB_ENDPOINT` (set in env.json) which defaults to `http://host.docker.internal:8000`.
+- Lambdas import shared code from the layer via absolute paths, e.g.:
+  `require('/opt/nodejs/shared/dynamodb')`
+- Routing uses `event.path` (not `event.resource`) so `/auth/register` matches as expected.
+
+### Quick test
+```bash
+curl -X POST http://127.0.0.1:3000/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"email":"test@gmasap.com","password":"securepass123","firstName":"Test","lastName":"User","role":"athlete"}'
 ```
 
 ### Deploying to AWS
