@@ -12,6 +12,13 @@ class EventService {
 
   async publishEvent(eventType, detail, detailType = null) {
     try {
+      // Local-dev friendliness: under SAM local, EventBridge calls will fail unless LocalStack/real AWS creds are configured.
+      // In local mode, we log and no-op so core flows (e.g., auth) keep working.
+      const isLocal = process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'local';
+      if (isLocal && process.env.DISABLE_EVENTS !== 'false') {
+        console.log(`[local] skipping EventBridge publish: ${eventType}`);
+        return null;
+      }
       const event = {
         Source: this.source,
         DetailType: detailType || eventType,
