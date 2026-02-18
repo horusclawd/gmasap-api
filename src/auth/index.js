@@ -1,4 +1,4 @@
-const bcrypt = require('bcrypt');
+const bcrypt = require('bcryptjs');
 const { DynamoDBService } = require('/opt/nodejs/shared/dynamodb');
 const { JWTService } = require('/opt/nodejs/shared/jwt');
 const { ResponseFormatter, ErrorResponses } = require('/opt/nodejs/shared/response');
