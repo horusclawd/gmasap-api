@@ -1,7 +1,7 @@
 const jwt = require('jsonwebtoken');
 
 // JWT secret - in production this should be from AWS Systems Manager Parameter Store
-const JWT_SECRET = process.env.JWT_SECRET || 'gmasap-dev-secret-key-change-in-production';
+const JWT_SECRET = process.env.JWT_SECRET || 'gmasap-dev-secret-key-change-in-production-12345';
 const JWT_EXPIRY = process.env.JWT_EXPIRY || '24h';
 const REFRESH_TOKEN_EXPIRY = process.env.REFRESH_TOKEN_EXPIRY || '7d';
 
